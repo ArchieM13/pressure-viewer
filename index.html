@@ -6,6 +6,7 @@
 <title>Procedure Data</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: #f4f7fb;
@@ -14,16 +15,56 @@ body {
     max-width: 900px;
     margin: 0 auto;
 }
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding: 14px 16px;
+    background: white;
+    border: 1px solid #c5d3e3;
+    border-radius: 10px;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+}
+
+.logo {
+    height: 52px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+}
+
+.header-text {
+    min-width: 0;
+}
+
+.urn {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    color: #4a5568;
+    margin-bottom: 4px;
+}
+
 h1 {
     font-size: 22px;
     margin-bottom: 4px;
     color: #000000;
 }
+
 .subtitle {
     color: #4a5568;
     font-size: 14px;
-    margin-bottom: 20px;
 }
+
 .card {
     background: white;
     border: 1px solid #c5d3e3;
@@ -31,6 +72,7 @@ h1 {
     padding: 16px;
     margin-bottom: 16px;
 }
+
 .card-title {
     font-size: 12px;
     text-transform: uppercase;
@@ -38,12 +80,14 @@ h1 {
     color: #8696aa;
     margin-bottom: 8px;
 }
+
 .summary {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 12px;
     margin-bottom: 16px;
 }
+
 .stat {
     background: white;
     border: 1px solid #c5d3e3;
@@ -51,18 +95,21 @@ h1 {
     border-radius: 6px;
     padding: 12px;
 }
+
 .stat-label {
     font-size: 11px;
     text-transform: uppercase;
     color: #8696aa;
     letter-spacing: 0.5px;
 }
+
 .stat-value {
     font-size: 24px;
     font-weight: 600;
     color: #1a1f2b;
     margin-top: 4px;
 }
+
 canvas {
     width: 100%;
     height: auto;
@@ -71,6 +118,7 @@ canvas {
     border-radius: 4px;
     background: #fafcff;
 }
+
 .legend {
     display: flex;
     gap: 16px;
@@ -78,6 +126,7 @@ canvas {
     font-size: 12px;
     color: #4a5568;
 }
+
 .legend-dot {
     display: inline-block;
     width: 10px;
@@ -86,11 +135,13 @@ canvas {
     margin-right: 4px;
     vertical-align: middle;
 }
+
 .dot-alert { background: #cc0000; }
-.dot-event { background: #000000; }
+
 .events {
     list-style: none;
 }
+
 .event {
     display: grid;
     grid-template-columns: 1fr auto auto;
@@ -99,16 +150,20 @@ canvas {
     padding: 10px 0;
     border-bottom: 1px solid #dde6f0;
 }
+
 .event:last-child { border-bottom: none; }
+
 .event-label {
     font-weight: 500;
 }
+
 .event-pressure {
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
     font-size: 13px;
     color: #1a1f2b;
     font-weight: 600;
 }
+
 .event-time {
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
     font-size: 13px;
@@ -116,9 +171,10 @@ canvas {
     min-width: 60px;
     text-align: right;
 }
+
 .event-alert .event-label { color: #cc0000; }
 .event-dismiss .event-label { color: #4a5568; }
-.event-logged .event-label { color: #000000; }
+
 .error {
     background: #fee;
     border: 1px solid #fcc;
@@ -126,20 +182,46 @@ canvas {
     padding: 16px;
     border-radius: 6px;
 }
+
 .no-events {
     color: #8696aa;
     font-style: italic;
     padding: 8px 0;
 }
+
 @media (max-width: 600px) {
-    .summary { grid-template-columns: 1fr 1fr; }
+    .header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .header-left {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .logo {
+        height: 44px;
+    }
+
+    .summary {
+        grid-template-columns: 1fr 1fr;
+    }
 }
 </style>
 </head>
 <body>
 
-<h1>Pressure Monitor Procedure Report</h1>
-<div class="subtitle">Decoded from device QR code</div>
+<div class="header">
+    <div class="header-left">
+        <img src="OrthoSonLogo.jpg" alt="OrthoSon logo" class="logo">
+        <div class="header-text">
+            <div class="urn">URN: 0001</div>
+            <h1>Pressure Monitor Procedure Report</h1>
+            <div class="subtitle">Decoded from device QR code</div>
+        </div>
+    </div>
+</div>
 
 <div id="content"></div>
 
@@ -148,13 +230,13 @@ const PRESSURE_MAX = 25.0;
 const SAMPLE_INTERVAL_S = 0.5;
 
 const EVENT_TYPES = {
-    1: { name: "NEEDLE ERROR",   class: "event-alert",   isAlert: true  },
-    2: { name: "LOW PRESSURE",   class: "event-alert",   isAlert: true  },
-    3: { name: "HIGH PRESSURE",  class: "event-alert",   isAlert: true  },
-    4: { name: "IVD FULL",       class: "event-alert",   isAlert: true  },
-    5: { name: "Event Logged",   class: "event-logged",  isAlert: false },
-    6: { name: "Alert Dismissed", class: "event-dismiss", isAlert: false },
+    1: { name: "NEEDLE ERROR",    class: "event-alert",    isAlert: true  },
+    2: { name: "LOW PRESSURE",    class: "event-alert",    isAlert: true  },
+    3: { name: "HIGH PRESSURE",   class: "event-alert",    isAlert: true  },
+    6: { name: "Alert Dismissed", class: "event-dismiss",  isAlert: false },
 };
+
+const HIDDEN_EVENT_TYPES = new Set([4, 5]); // 4 = IVD FULL, 5 = Event Logged
 
 function decodeBase64URL(str) {
     const b64chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
@@ -197,7 +279,6 @@ function parseBlob(bytes) {
     return { samples, events };
 }
 
-// Get pressure at a given time in seconds (interpolate between samples)
 function pressureAtTime(samples, timeS) {
     if (samples.length === 0) return 0;
     const idx = timeS / SAMPLE_INTERVAL_S;
@@ -226,7 +307,6 @@ function drawGraph(canvas, samples, events) {
     ctx.fillStyle = "#fafcff";
     ctx.fillRect(0, 0, cssW, cssH);
 
-    // Y-axis grid + labels
     ctx.strokeStyle = "#dde6f0";
     ctx.fillStyle = "#8696aa";
     ctx.font = "11px sans-serif";
@@ -242,17 +322,15 @@ function drawGraph(canvas, samples, events) {
         ctx.fillText(v.toFixed(0), padL - 4, y);
     }
 
-    // X-axis labels
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
     const totalS = samples.length * SAMPLE_INTERVAL_S;
     const stepS = totalS > 60 ? 30 : (totalS > 20 ? 10 : 5);
     for (let s = 0; s <= totalS; s += stepS) {
-        const x = padL + (s / totalS) * w;
+        const x = totalS > 0 ? padL + (s / totalS) * w : padL;
         ctx.fillText(s + "s", x, padT + h + 6);
     }
 
-    // Pressure trace
     if (samples.length > 1) {
         ctx.strokeStyle = "#74E0AF";
         ctx.lineWidth = 2;
@@ -266,15 +344,15 @@ function drawGraph(canvas, samples, events) {
         ctx.stroke();
     }
 
-    // Event markers on the trace
     for (const ev of events) {
+        if (HIDDEN_EVENT_TYPES.has(ev.type)) continue;
+
         const meta = EVENT_TYPES[ev.type];
         if (!meta) continue;
-        // Skip dismiss markers — they clutter and aren't an event point
         if (ev.type === 6) continue;
 
         const pressure = pressureAtTime(samples, ev.timestampS);
-        const x = padL + (ev.timestampS / totalS) * w;
+        const x = totalS > 0 ? padL + (ev.timestampS / totalS) * w : padL;
         const y = padT + h - (pressure / PRESSURE_MAX) * h;
 
         ctx.fillStyle = meta.isAlert ? "#cc0000" : "#000000";
@@ -282,13 +360,11 @@ function drawGraph(canvas, samples, events) {
         ctx.arc(x, y, 6, 0, Math.PI * 2);
         ctx.fill();
 
-        // White ring for visibility
         ctx.strokeStyle = "white";
         ctx.lineWidth = 2;
         ctx.stroke();
     }
 
-    // Border
     ctx.strokeStyle = "#c5d3e3";
     ctx.lineWidth = 1;
     ctx.strokeRect(padL, padT, w, h);
@@ -319,14 +395,16 @@ function render() {
     }
 
     const { samples, events } = data;
+    const visibleEvents = events.filter(e => !HIDDEN_EVENT_TYPES.has(e.type));
+
     const durationS = Math.round(samples.length * SAMPLE_INTERVAL_S);
     const peak = samples.length ? Math.max(...samples).toFixed(1) : "—";
 
     let eventHTML;
-    if (events.length === 0) {
+    if (visibleEvents.length === 0) {
         eventHTML = '<div class="no-events">No events recorded during procedure.</div>';
     } else {
-        eventHTML = '<ul class="events">' + events.map(e => {
+        eventHTML = '<ul class="events">' + visibleEvents.map(e => {
             const meta = EVENT_TYPES[e.type] || { name: "Unknown (" + e.type + ")", class: "" };
             const pressure = pressureAtTime(samples, e.timestampS).toFixed(1);
             return `<li class="event ${meta.class}">
@@ -354,12 +432,11 @@ function render() {
             <canvas id="graph"></canvas>
             <div class="legend">
                 <span><span class="legend-dot dot-alert"></span>Alert triggered</span>
-                <span><span class="legend-dot dot-event"></span>Event logged</span>
             </div>
         </div>
 
         <div class="card">
-            <div class="card-title">Event Log (${events.length})</div>
+            <div class="card-title">Event Log (${visibleEvents.length})</div>
             ${eventHTML}
         </div>
     `;
