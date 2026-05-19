@@ -65,6 +65,29 @@ h1 {
     font-size: 14px;
 }
 
+.download-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 16px;
+}
+
+.download-btn {
+    appearance: none;
+    border: 1px solid #1a1f2b;
+    background: #1a1f2b;
+    color: white;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.download-btn:hover {
+    background: #2b3344;
+    border-color: #2b3344;
+}
+
 .card {
     background: white;
     border: 1px solid #c5d3e3;
@@ -207,6 +230,14 @@ canvas {
     .summary {
         grid-template-columns: 1fr 1fr;
     }
+
+    .download-row {
+        justify-content: stretch;
+    }
+
+    .download-btn {
+        width: 100%;
+    }
 }
 </style>
 </head>
@@ -230,10 +261,10 @@ const PRESSURE_MAX = 25.0;
 const SAMPLE_INTERVAL_S = 0.5;
 
 const EVENT_TYPES = {
-    1: { name: "NEEDLE ERROR",    class: "event-alert",    isAlert: true  },
-    2: { name: "LOW PRESSURE",    class: "event-alert",    isAlert: true  },
-    3: { name: "HIGH PRESSURE",   class: "event-alert",    isAlert: true  },
-    6: { name: "Alert Dismissed", class: "event-dismiss",  isAlert: false },
+    1: { name: "NEEDLE ERROR",    class: "event-alert",   isAlert: true  },
+    2: { name: "LOW PRESSURE",    class: "event-alert",   isAlert: true  },
+    3: { name: "HIGH PRESSURE",   class: "event-alert",   isAlert: true  },
+    6: { name: "Alert Dismissed", class: "event-dismiss", isAlert: false }
 };
 
 const HIDDEN_EVENT_TYPES = new Set([4, 5]); // 4 = IVD FULL, 5 = Event Logged
@@ -242,27 +273,35 @@ function decodeBase64URL(str) {
     const b64chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     const out = [];
     let i = 0;
+
     while (i < str.length) {
         const c1 = b64chars.indexOf(str[i++]);
         const c2 = b64chars.indexOf(str[i++]);
         const c3 = i < str.length ? b64chars.indexOf(str[i++]) : -1;
         const c4 = i < str.length ? b64chars.indexOf(str[i++]) : -1;
+
         if (c1 < 0 || c2 < 0) break;
+
         const v = (c1 << 18) | (c2 << 12) | ((c3 < 0 ? 0 : c3) << 6) | (c4 < 0 ? 0 : c4);
         out.push((v >> 16) & 0xFF);
         if (c3 >= 0) out.push((v >> 8) & 0xFF);
         if (c4 >= 0) out.push(v & 0xFF);
     }
+
     return out;
 }
 
 function parseBlob(bytes) {
     let idx = 0;
     const version = bytes[idx++];
-    if (version !== 0x01) throw new Error("Unsupported data version: " + version);
+
+    if (version !== 0x01) {
+        throw new Error("Unsupported data version: " + version);
+    }
 
     const sampleCount = (bytes[idx++] << 8) | bytes[idx++];
     const samples = [];
+
     for (let i = 0; i < sampleCount; i++) {
         const b = bytes[idx++];
         samples.push((b / 255) * PRESSURE_MAX);
@@ -270,6 +309,7 @@ function parseBlob(bytes) {
 
     const eventCount = bytes[idx++];
     const events = [];
+
     for (let i = 0; i < eventCount; i++) {
         const type = bytes[idx++];
         const ts = (bytes[idx++] << 8) | bytes[idx++];
@@ -281,13 +321,95 @@ function parseBlob(bytes) {
 
 function pressureAtTime(samples, timeS) {
     if (samples.length === 0) return 0;
+
     const idx = timeS / SAMPLE_INTERVAL_S;
     const i0 = Math.floor(idx);
     const i1 = Math.min(i0 + 1, samples.length - 1);
+
     if (i0 < 0) return samples[0];
     if (i0 >= samples.length) return samples[samples.length - 1];
+
     const t = idx - i0;
     return samples[i0] * (1 - t) + samples[i1] * t;
+}
+
+function buildAlertTimeline(events) {
+    const relevant = events
+        .filter(e => e.type === 1 || e.type === 2 || e.type === 3 || e.type === 6)
+        .sort((a, b) => a.timestampS - b.timestampS);
+
+    let active = false;
+    let activeLabel = "";
+    const timeline = [];
+
+    for (const ev of relevant) {
+        if (ev.type === 6) {
+            active = false;
+            activeLabel = "";
+        } else {
+            active = true;
+            activeLabel = EVENT_TYPES[ev.type]?.name || "";
+        }
+
+        timeline.push({
+            timestampS: ev.timestampS,
+            active,
+            label: activeLabel
+        });
+    }
+
+    return timeline;
+}
+
+function alertStateAtTime(timeline, timeS) {
+    let state = { active: false, label: "" };
+
+    for (const item of timeline) {
+        if (item.timestampS <= timeS) {
+            state = { active: item.active, label: item.label };
+        } else {
+            break;
+        }
+    }
+
+    return state;
+}
+
+function buildCSV(samples, events) {
+    const timeline = buildAlertTimeline(events);
+    const rows = [["time_s", "pressure", "alert_active", "alert_type"]];
+
+    for (let i = 0; i < samples.length; i++) {
+        const timeS = +(i * SAMPLE_INTERVAL_S).toFixed(1);
+        const pressure = samples[i].toFixed(1);
+        const alert = alertStateAtTime(timeline, timeS);
+
+        rows.push([
+            timeS,
+            pressure,
+            alert.active ? "yes" : "no",
+            alert.label
+        ]);
+    }
+
+    return rows.map(row =>
+        row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(",")
+    ).join("\n");
+}
+
+function downloadCSV(samples, events) {
+    const csv = buildCSV(samples, events);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "pressure_readings.csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    URL.revokeObjectURL(url);
 }
 
 function drawGraph(canvas, samples, events) {
@@ -295,6 +417,7 @@ function drawGraph(canvas, samples, events) {
     const dpr = window.devicePixelRatio || 1;
     const cssW = canvas.clientWidth;
     const cssH = 320;
+
     canvas.width = cssW * dpr;
     canvas.height = cssH * dpr;
     canvas.style.height = cssH + "px";
@@ -312,6 +435,7 @@ function drawGraph(canvas, samples, events) {
     ctx.font = "11px sans-serif";
     ctx.textAlign = "right";
     ctx.textBaseline = "middle";
+
     for (let i = 0; i <= 5; i++) {
         const v = (PRESSURE_MAX / 5) * i;
         const y = padT + h - (v / PRESSURE_MAX) * h;
@@ -326,6 +450,7 @@ function drawGraph(canvas, samples, events) {
     ctx.textBaseline = "top";
     const totalS = samples.length * SAMPLE_INTERVAL_S;
     const stepS = totalS > 60 ? 30 : (totalS > 20 ? 10 : 5);
+
     for (let s = 0; s <= totalS; s += stepS) {
         const x = totalS > 0 ? padL + (s / totalS) * w : padL;
         ctx.fillText(s + "s", x, padT + h + 6);
@@ -335,12 +460,14 @@ function drawGraph(canvas, samples, events) {
         ctx.strokeStyle = "#74E0AF";
         ctx.lineWidth = 2;
         ctx.beginPath();
+
         for (let i = 0; i < samples.length; i++) {
             const x = padL + (i / (samples.length - 1)) * w;
             const y = padT + h - (samples[i] / PRESSURE_MAX) * h;
             if (i === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
         }
+
         ctx.stroke();
     }
 
@@ -416,6 +543,10 @@ function render() {
     }
 
     content.innerHTML = `
+        <div class="download-row">
+            <button class="download-btn" id="downloadCsvBtn">Download pressure readings CSV</button>
+        </div>
+
         <div class="summary">
             <div class="stat">
                 <div class="stat-label">Duration</div>
@@ -442,6 +573,10 @@ function render() {
     `;
 
     drawGraph(document.getElementById("graph"), samples, events);
+
+    document.getElementById("downloadCsvBtn").addEventListener("click", () => {
+        downloadCSV(samples, events);
+    });
 }
 
 render();
