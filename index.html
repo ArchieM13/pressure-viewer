@@ -261,9 +261,9 @@ const PRESSURE_MAX = 25.0;
 const SAMPLE_INTERVAL_S = 0.5;
 
 const EVENT_TYPES = {
-    1: { name: "NEEDLE ERROR",    class: "event-alert",   isAlert: true  },
-    2: { name: "LOW PRESSURE",    class: "event-alert",   isAlert: true  },
-    3: { name: "HIGH PRESSURE",   class: "event-alert",   isAlert: true  },
+    1: { name: "NEEDLE ERROR", class: "event-alert", isAlert: true },
+    2: { name: "LOW PRESSURE", class: "event-alert", isAlert: true },
+    3: { name: "HIGH PRESSURE", class: "event-alert", isAlert: true },
     6: { name: "Alert Dismissed", class: "event-dismiss", isAlert: false }
 };
 
@@ -333,67 +333,77 @@ function pressureAtTime(samples, timeS) {
     return samples[i0] * (1 - t) + samples[i1] * t;
 }
 
-function buildAlertTimeline(events) {
-    const relevant = events
-        .filter(e => e.type === 1 || e.type === 2 || e.type === 3 || e.type === 6)
+function buildCSV(samples, events) {
+    const rows = [
+        ["Patient Procedure Data Log"],
+        ["URN: 0001"],
+        [],
+        ["time_s", "pressure", "alert_active", "alert_type"]
+    ];
+
+    const filteredEvents = events
+        .filter(e => e.type === 1 || e.type === 2 || e.type === 3)
         .sort((a, b) => a.timestampS - b.timestampS);
 
-    let active = false;
-    let activeLabel = "";
-    const timeline = [];
-
-    for (const ev of relevant) {
-        if (ev.type === 6) {
-            active = false;
-            activeLabel = "";
-        } else {
-            active = true;
-            activeLabel = EVENT_TYPES[ev.type]?.name || "";
-        }
-
-        timeline.push({
-            timestampS: ev.timestampS,
-            active,
-            label: activeLabel
-        });
-    }
-
-    return timeline;
-}
-
-function alertStateAtTime(timeline, timeS) {
-    let state = { active: false, label: "" };
-
-    for (const item of timeline) {
-        if (item.timestampS <= timeS) {
-            state = { active: item.active, label: item.label };
-        } else {
-            break;
-        }
-    }
-
-    return state;
-}
-
-function buildCSV(samples, events) {
-    const timeline = buildAlertTimeline(events);
-    const rows = [["time_s", "pressure", "alert_active", "alert_type"]];
+    let nextEventIndex = 0;
+    let activeAlertType = null;
 
     for (let i = 0; i < samples.length; i++) {
         const timeS = +(i * SAMPLE_INTERVAL_S).toFixed(1);
-        const pressure = samples[i].toFixed(1);
-        const alert = alertStateAtTime(timeline, timeS);
+        const pressure = samples[i];
+        const pressureText = pressure.toFixed(1);
+
+        while (
+            nextEventIndex < filteredEvents.length &&
+            filteredEvents[nextEventIndex].timestampS <= timeS
+        ) {
+            activeAlertType = filteredEvents[nextEventIndex].type;
+            nextEventIndex++;
+        }
+
+        let alertActive = false;
+        let alertLabel = "";
+
+        if (activeAlertType === 1) {
+            alertActive = false;
+            alertLabel = "";
+        } else if (activeAlertType === 2) {
+            if (pressure < 4.0) {
+                alertActive = true;
+                alertLabel = "LOW PRESSURE";
+            } else {
+                activeAlertType = null;
+            }
+        } else if (activeAlertType === 3) {
+            if (pressure > 20.0) {
+                alertActive = true;
+                alertLabel = "HIGH PRESSURE";
+            } else {
+                activeAlertType = null;
+            }
+        }
 
         rows.push([
             timeS,
-            pressure,
-            alert.active ? "yes" : "no",
-            alert.label
+            pressureText,
+            alertActive ? "yes" : "no",
+            alertLabel
         ]);
     }
 
+    for (const ev of filteredEvents) {
+        if (ev.type !== 1) continue;
+
+        const sampleIndex = Math.round(ev.timestampS / SAMPLE_INTERVAL_S);
+        const rowIndex = sampleIndex + 4;
+        if (rowIndex >= 4 && rowIndex < rows.length) {
+            rows[rowIndex][2] = "yes";
+            rows[rowIndex][3] = "NEEDLE ERROR";
+        }
+    }
+
     return rows.map(row =>
-        row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(",")
+        row.map(value => `"${String(value ?? "").replace(/"/g, '""')}"`).join(",")
     ).join("\n");
 }
 
@@ -404,7 +414,7 @@ function downloadCSV(samples, events) {
 
     const a = document.createElement("a");
     a.href = url;
-    a.download = "pressure_readings.csv";
+    a.download = "patient_procedure_data_log.csv";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
