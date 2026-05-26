@@ -277,7 +277,12 @@ function buildCSV(samples, events) {
             alertLabel = "HIGH PRESSURE";
         }
 
-        rows.push([timeS.toFixed(0), samples[i].toFixed(1), alertActive, alertLabel]);
+        rows.push([
+            timeS.toFixed(0),
+            samples[i].toFixed(1),
+            alertActive,
+            alertLabel
+        ]);
     }
 
     return rows.map(row =>
