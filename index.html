@@ -438,7 +438,7 @@ function drawGraph(canvas, samples, events) {
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
 
-    const totalS = Math.max(0, (samples.length - 1) * SAMPLE_INTERVAL_S);
+    const totalS = samples.length > 0 ? (samples.length - 1) * SAMPLE_INTERVAL_S : 0;
     const stepS = totalS > 60 ? 30 : (totalS > 20 ? 10 : 5);
 
     for (let s = 0; s <= totalS; s += stepS) {
