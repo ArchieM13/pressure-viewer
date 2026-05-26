@@ -250,9 +250,8 @@ canvas {
 
 <script>
 const PRESSURE_MAX = 25.0;
-
-let EXPORTED_SAMPLE_RATE_HZ = 1;
-let SAMPLE_INTERVAL_S = 1.0;
+const SAMPLE_INTERVAL_S = 1.0;
+const EXPORTED_SAMPLE_RATE_HZ = 1;
 
 const EVENT_TYPES = {
     1: { name: "NEEDLE ERROR", class: "event-alert", isAlert: true },
@@ -289,16 +288,7 @@ function parseBlob(bytes) {
     let idx = 0;
     const version = bytes[idx++];
 
-    let sampleRateHz = 1;
-
-    if (version === 0x01) {
-        sampleRateHz = 1;
-    } else if (version === 0x02) {
-        sampleRateHz = bytes[idx++];
-        if (!sampleRateHz || sampleRateHz < 1) {
-            throw new Error("Invalid sample rate in QR payload");
-        }
-    } else {
+    if (version !== 0x01) {
         throw new Error("Unsupported data version: " + version);
     }
 
@@ -319,7 +309,7 @@ function parseBlob(bytes) {
         events.push({ type, timestampS: ts });
     }
 
-    return { samples, events, sampleRateHz };
+    return { samples, events };
 }
 
 function pressureAtTime(samples, timeS) {
@@ -340,7 +330,7 @@ function buildCSV(samples, events) {
     const rows = [
         ["Patient Procedure Data Log"],
         ["URN: 0001"],
-        [`Sample rate: ${EXPORTED_SAMPLE_RATE_HZ} Hz QR-exported data`],
+        ["Sample rate: 1 Hz QR-exported data"],
         [],
         ["time_s", "pressure", "alert_active", "alert_type"]
     ];
@@ -350,7 +340,7 @@ function buildCSV(samples, events) {
     const sortedEvents = [...events].sort((a, b) => a.timestampS - b.timestampS);
 
     for (let i = 0; i < samples.length; i++) {
-        const timeS = i * SAMPLE_INTERVAL_S;
+        const timeS = i;
 
         while (eventIndex < sortedEvents.length && sortedEvents[eventIndex].timestampS <= timeS) {
             const ev = sortedEvents[eventIndex];
@@ -374,7 +364,7 @@ function buildCSV(samples, events) {
         }
 
         rows.push([
-            timeS.toFixed(3).replace(/\.?0+$/, ""),
+            String(timeS),
             samples[i].toFixed(1),
             alertActive,
             alertLabel
@@ -438,7 +428,7 @@ function drawGraph(canvas, samples, events) {
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
 
-    const totalS = samples.length > 0 ? (samples.length - 1) * SAMPLE_INTERVAL_S : 0;
+    const totalS = samples.length > 0 ? samples.length - 1 : 0;
     const stepS = totalS > 60 ? 30 : (totalS > 20 ? 10 : 5);
 
     for (let s = 0; s <= totalS; s += stepS) {
@@ -511,12 +501,9 @@ function render() {
         return;
     }
 
-    const { samples, events, sampleRateHz } = data;
-    EXPORTED_SAMPLE_RATE_HZ = sampleRateHz;
-    SAMPLE_INTERVAL_S = 1 / sampleRateHz;
-
+    const { samples, events } = data;
     const visibleEvents = events.filter(e => !HIDDEN_EVENT_TYPES.has(e.type));
-    const durationS = samples.length > 0 ? (samples.length - 1) * SAMPLE_INTERVAL_S : 0;
+    const durationS = samples.length > 0 ? samples.length - 1 : 0;
     const peak = samples.length ? Math.max(...samples).toFixed(1) : "—";
 
     let eventHTML;
