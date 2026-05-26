@@ -6,6 +6,7 @@
 <title>Procedure Data</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background: #f4f7fb;
@@ -14,6 +15,7 @@ body {
     max-width: 900px;
     margin: 0 auto;
 }
+
 .header {
     display: flex;
     align-items: center;
@@ -25,14 +27,23 @@ body {
     border: 1px solid #c5d3e3;
     border-radius: 10px;
 }
+
 .header-left {
     display: flex;
     align-items: center;
     gap: 14px;
     min-width: 0;
 }
-.logo { height: 52px; width: auto; display: block; object-fit: contain; }
+
+.logo {
+    height: 52px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+}
+
 .header-text { min-width: 0; }
+
 .urn {
     font-size: 12px;
     font-weight: 700;
@@ -40,9 +51,24 @@ body {
     color: #4a5568;
     margin-bottom: 4px;
 }
-h1 { font-size: 22px; margin-bottom: 4px; color: #000000; }
-.subtitle { color: #4a5568; font-size: 14px; }
-.download-row { display: flex; justify-content: flex-end; margin-bottom: 16px; }
+
+h1 {
+    font-size: 22px;
+    margin-bottom: 4px;
+    color: #000000;
+}
+
+.subtitle {
+    color: #4a5568;
+    font-size: 14px;
+}
+
+.download-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 16px;
+}
+
 .download-btn {
     appearance: none;
     border: 1px solid #1a1f2b;
@@ -54,7 +80,12 @@ h1 { font-size: 22px; margin-bottom: 4px; color: #000000; }
     font-weight: 600;
     cursor: pointer;
 }
-.download-btn:hover { background: #2b3344; border-color: #2b3344; }
+
+.download-btn:hover {
+    background: #2b3344;
+    border-color: #2b3344;
+}
+
 .card {
     background: white;
     border: 1px solid #c5d3e3;
@@ -62,6 +93,7 @@ h1 { font-size: 22px; margin-bottom: 4px; color: #000000; }
     padding: 16px;
     margin-bottom: 16px;
 }
+
 .card-title {
     font-size: 12px;
     text-transform: uppercase;
@@ -69,12 +101,14 @@ h1 { font-size: 22px; margin-bottom: 4px; color: #000000; }
     color: #8696aa;
     margin-bottom: 8px;
 }
+
 .summary {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 12px;
     margin-bottom: 16px;
 }
+
 .stat {
     background: white;
     border: 1px solid #c5d3e3;
@@ -82,13 +116,21 @@ h1 { font-size: 22px; margin-bottom: 4px; color: #000000; }
     border-radius: 6px;
     padding: 12px;
 }
+
 .stat-label {
     font-size: 11px;
     text-transform: uppercase;
     color: #8696aa;
     letter-spacing: 0.5px;
 }
-.stat-value { font-size: 24px; font-weight: 600; color: #1a1f2b; margin-top: 4px; }
+
+.stat-value {
+    font-size: 24px;
+    font-weight: 600;
+    color: #1a1f2b;
+    margin-top: 4px;
+}
+
 canvas {
     width: 100%;
     height: auto;
@@ -97,7 +139,15 @@ canvas {
     border-radius: 4px;
     background: #fafcff;
 }
-.legend { display: flex; gap: 16px; margin-top: 10px; font-size: 12px; color: #4a5568; }
+
+.legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 10px;
+    font-size: 12px;
+    color: #4a5568;
+}
+
 .legend-dot {
     display: inline-block;
     width: 10px;
@@ -106,8 +156,11 @@ canvas {
     margin-right: 4px;
     vertical-align: middle;
 }
+
 .dot-alert { background: #cc0000; }
+
 .events { list-style: none; }
+
 .event {
     display: grid;
     grid-template-columns: 1fr auto auto;
@@ -116,14 +169,18 @@ canvas {
     padding: 10px 0;
     border-bottom: 1px solid #dde6f0;
 }
+
 .event:last-child { border-bottom: none; }
+
 .event-label { font-weight: 500; }
+
 .event-pressure {
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
     font-size: 13px;
     color: #1a1f2b;
     font-weight: 600;
 }
+
 .event-time {
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
     font-size: 13px;
@@ -131,8 +188,10 @@ canvas {
     min-width: 60px;
     text-align: right;
 }
+
 .event-alert .event-label { color: #cc0000; }
 .event-dismiss .event-label { color: #4a5568; }
+
 .error {
     background: #fee;
     border: 1px solid #fcc;
@@ -140,18 +199,42 @@ canvas {
     padding: 16px;
     border-radius: 6px;
 }
-.no-events { color: #8696aa; font-style: italic; padding: 8px 0; }
+
+.no-events {
+    color: #8696aa;
+    font-style: italic;
+    padding: 8px 0;
+}
+
 @media (max-width: 600px) {
-    .header { flex-direction: column; align-items: flex-start; }
-    .header-left { align-items: flex-start; flex-direction: column; }
+    .header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .header-left {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
     .logo { height: 44px; }
-    .summary { grid-template-columns: 1fr; }
-    .download-row { justify-content: stretch; }
-    .download-btn { width: 100%; }
+
+    .summary {
+        grid-template-columns: 1fr;
+    }
+
+    .download-row {
+        justify-content: stretch;
+    }
+
+    .download-btn {
+        width: 100%;
+    }
 }
 </style>
 </head>
 <body>
+
 <div class="header">
     <div class="header-left">
         <img src="OrthoSonLogo.jpg" alt="OrthoSon logo" class="logo">
@@ -162,10 +245,14 @@ canvas {
         </div>
     </div>
 </div>
+
 <div id="content"></div>
+
 <script>
 const PRESSURE_MAX = 25.0;
-const SAMPLE_INTERVAL_S = 1.0;
+
+let EXPORTED_SAMPLE_RATE_HZ = 1;
+let SAMPLE_INTERVAL_S = 1.0;
 
 const EVENT_TYPES = {
     1: { name: "NEEDLE ERROR", class: "event-alert", isAlert: true },
@@ -202,7 +289,16 @@ function parseBlob(bytes) {
     let idx = 0;
     const version = bytes[idx++];
 
-    if (version !== 0x01) {
+    let sampleRateHz = 1;
+
+    if (version === 0x01) {
+        sampleRateHz = 1;
+    } else if (version === 0x02) {
+        sampleRateHz = bytes[idx++];
+        if (!sampleRateHz || sampleRateHz < 1) {
+            throw new Error("Invalid sample rate in QR payload");
+        }
+    } else {
         throw new Error("Unsupported data version: " + version);
     }
 
@@ -223,7 +319,7 @@ function parseBlob(bytes) {
         events.push({ type, timestampS: ts });
     }
 
-    return { samples, events };
+    return { samples, events, sampleRateHz };
 }
 
 function pressureAtTime(samples, timeS) {
@@ -244,7 +340,7 @@ function buildCSV(samples, events) {
     const rows = [
         ["Patient Procedure Data Log"],
         ["URN: 0001"],
-        ["Sample rate: 1 Hz QR-exported average data"],
+        [`Sample rate: ${EXPORTED_SAMPLE_RATE_HZ} Hz QR-exported data`],
         [],
         ["time_s", "pressure", "alert_active", "alert_type"]
     ];
@@ -278,16 +374,16 @@ function buildCSV(samples, events) {
         }
 
         rows.push([
-            timeS.toFixed(0),
+            timeS.toFixed(3).replace(/\.?0+$/, ""),
             samples[i].toFixed(1),
             alertActive,
             alertLabel
         ]);
     }
 
-    return rows.map(row =>
-        row.map(value => `"${String(value ?? "").replace(/"/g, '""')}"`).join(",")
-    ).join("\n");
+    return rows
+        .map(row => row.map(value => `"${String(value ?? "").replace(/"/g, '""')}"`).join(","))
+        .join("\n");
 }
 
 function downloadCSV(samples, events) {
@@ -341,7 +437,8 @@ function drawGraph(canvas, samples, events) {
 
     ctx.textAlign = "center";
     ctx.textBaseline = "top";
-    const totalS = samples.length * SAMPLE_INTERVAL_S;
+
+    const totalS = Math.max(0, (samples.length - 1) * SAMPLE_INTERVAL_S);
     const stepS = totalS > 60 ? 30 : (totalS > 20 ? 10 : 5);
 
     for (let s = 0; s <= totalS; s += stepS) {
@@ -390,8 +487,9 @@ function drawGraph(canvas, samples, events) {
 }
 
 function fmtTime(s) {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
+    const total = Math.round(s);
+    const m = Math.floor(total / 60);
+    const sec = total % 60;
     return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
 }
 
@@ -413,10 +511,12 @@ function render() {
         return;
     }
 
-    const { samples, events } = data;
-    const visibleEvents = events.filter(e => !HIDDEN_EVENT_TYPES.has(e.type));
+    const { samples, events, sampleRateHz } = data;
+    EXPORTED_SAMPLE_RATE_HZ = sampleRateHz;
+    SAMPLE_INTERVAL_S = 1 / sampleRateHz;
 
-    const durationS = Math.round(samples.length * SAMPLE_INTERVAL_S);
+    const visibleEvents = events.filter(e => !HIDDEN_EVENT_TYPES.has(e.type));
+    const durationS = samples.length > 0 ? (samples.length - 1) * SAMPLE_INTERVAL_S : 0;
     const peak = samples.length ? Math.max(...samples).toFixed(1) : "—";
 
     let eventHTML;
@@ -450,7 +550,7 @@ function render() {
             </div>
             <div class="stat">
                 <div class="stat-label">Sample Rate</div>
-                <div class="stat-value">1 Hz</div>
+                <div class="stat-value">${EXPORTED_SAMPLE_RATE_HZ} Hz</div>
             </div>
         </div>
 
@@ -478,5 +578,6 @@ function render() {
 render();
 window.addEventListener("hashchange", render);
 </script>
+
 </body>
 </html>
