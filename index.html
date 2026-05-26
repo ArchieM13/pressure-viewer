@@ -733,11 +733,42 @@ function startInPageScan() {
         return;
     }
 
-    qrScanner = new Html5Qrcode("reader");
-    const config = { fps: 10, qrbox: { width: 240, height: 240 } };
+    // Use the browser's native barcode detector when available (iOS 16.4+,
+    // modern Chrome). This is hardware-accelerated and dramatically faster —
+    // closer to what dedicated apps feel like — and we fall back to the
+    // library's own decoder otherwise.
+    const scannerConfig = { useBarCodeDetectorIfSupported: true };
+    if (typeof Html5QrcodeSupportedFormats !== "undefined") {
+        scannerConfig.formatsToSupport = [Html5QrcodeSupportedFormats.QR_CODE];
+    }
+    qrScanner = new Html5Qrcode("reader", scannerConfig);
+
+    // Adaptive scan box: a large square based on the live viewport so the
+    // user doesn't have to line the code up precisely. 70% of the smaller
+    // dimension, capped so it stays sensible on big screens.
+    const qrboxFn = (vw, vh) => {
+        const min = Math.min(vw, vh);
+        const size = Math.floor(min * 0.7);
+        return { width: size, height: size };
+    };
+
+    const config = {
+        fps: 25,                      // more decode attempts per second
+        qrbox: qrboxFn,
+        aspectRatio: 1.0,
+        videoConstraints: {
+            facingMode: { ideal: "environment" },
+            width:  { ideal: 1920 },  // request a high-res stream: more pixels
+            height: { ideal: 1080 },  // on the code = easier, faster decode
+            // Continuous autofocus so the camera locks on without you
+            // having to hunt for the exact distance.
+            focusMode: "continuous",
+            advanced: [{ focusMode: "continuous" }]
+        }
+    };
 
     qrScanner.start(
-        { facingMode: "environment" },
+        config.videoConstraints,
         config,
         (decodedText) => {
             // Got a scan — ingest it.
@@ -756,7 +787,36 @@ function startInPageScan() {
         (errMsg) => { /* per-frame decode failures: ignore */ }
     ).then(() => {
         btn.style.display = "none";
-        hint.textContent = "Point the camera at the next QR code on the device.";
+        hint.textContent = "Point the camera at the next QR code — it'll scan automatically.";
+    }).catch((err) => {
+        // Fall back to a simpler constraint set if the high-res / focus
+        // request was rejected by the browser.
+        startInPageScanFallback(btn, hint, err);
+    });
+}
+
+// Simpler, maximally-compatible fallback if the rich constraints fail.
+function startInPageScanFallback(btn, hint, originalErr) {
+    qrScanner = new Html5Qrcode("reader", {
+        useBarCodeDetectorIfSupported: true
+    });
+
+    qrScanner.start(
+        { facingMode: "environment" },
+        { fps: 15, qrbox: { width: 260, height: 260 } },
+        (decodedText) => {
+            const frag = fragmentFromText(decodedText);
+            if (ingestFragment(frag)) {
+                stopScanner(() => {
+                    if (allPartsSeen()) renderReport();
+                    else renderGate();
+                });
+            }
+        },
+        () => {}
+    ).then(() => {
+        btn.style.display = "none";
+        hint.textContent = "Point the camera at the next QR code — it'll scan automatically.";
     }).catch((err) => {
         hint.textContent = "Could not start camera: " + err +
             ". Make sure camera permission is allowed for this site.";
