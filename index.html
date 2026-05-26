@@ -131,7 +131,7 @@ h1 {
     margin-top: 4px;
 }
 
-canvas {
+canvas#graph {
     width: 100%;
     height: auto;
     display: block;
@@ -206,6 +206,112 @@ canvas {
     padding: 8px 0;
 }
 
+/* ── Multi-scan gate UI ─────────────────────────────────── */
+.scan-gate {
+    background: white;
+    border: 1px solid #c5d3e3;
+    border-radius: 10px;
+    padding: 24px 20px;
+    text-align: center;
+}
+
+.scan-progress {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid #c5d3e3;
+    color: #8696aa;
+    background: #f4f7fb;
+}
+
+.pill.done {
+    color: #0a7d4d;
+    border-color: #74E0AF;
+    background: #effaf3;
+}
+
+.pill .tick {
+    display: inline-flex;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #74E0AF;
+    color: white;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+}
+
+.scan-gate h2 {
+    font-size: 18px;
+    margin-bottom: 6px;
+    color: #1a1f2b;
+}
+
+.scan-gate p {
+    color: #4a5568;
+    font-size: 14px;
+    margin-bottom: 18px;
+    line-height: 1.5;
+}
+
+.scan-btn {
+    appearance: none;
+    border: none;
+    background: #0055b8;
+    color: white;
+    border-radius: 8px;
+    padding: 14px 22px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.scan-btn:hover { background: #003d82; }
+
+.scan-btn:disabled {
+    background: #c5d3e3;
+    cursor: default;
+}
+
+#reader {
+    width: 100%;
+    max-width: 360px;
+    margin: 0 auto 16px;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.scan-hint {
+    font-size: 12px;
+    color: #8696aa;
+    margin-top: 4px;
+}
+
+.scan-cancel {
+    appearance: none;
+    border: 1px solid #c5d3e3;
+    background: white;
+    color: #4a5568;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+}
+
 @media (max-width: 600px) {
     .header {
         flex-direction: column;
@@ -248,6 +354,8 @@ canvas {
 
 <div id="content"></div>
 
+<!-- QR scanning library for the in-page second-code scan -->
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 const PRESSURE_MAX = 25.0;
 const SAMPLE_INTERVAL_S = 1.0;
@@ -261,6 +369,20 @@ const EVENT_TYPES = {
 };
 
 const HIDDEN_EVENT_TYPES = new Set([]);
+
+// ── Multi-scan session state ────────────────────────────────
+// Each QR carries: sid (session id), part (1..total), total, and data.
+// For the demo, every part carries the FULL dataset, so any part can
+// render the report — but we still require all parts to be *seen*
+// before unlocking, to exercise the real multi-scan flow.
+const scanSession = {
+    sid: null,
+    total: 1,
+    partsSeen: new Set(),
+    fullData: null   // {samples, events} from any complete part
+};
+
+let qrScanner = null;
 
 function decodeBase64URL(str) {
     const b64chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
@@ -310,6 +432,75 @@ function parseBlob(bytes) {
     }
 
     return { samples, events };
+}
+
+// Parse a scanned/loaded fragment string into its fields.
+// Expected fragment format:  sid=<id>&part=<n>&total=<n>&d=<base64data>
+// Falls back to treating the whole thing as raw data (single-part, legacy).
+function parseFragment(frag) {
+    if (!frag) return null;
+
+    // Legacy / single-code form: the whole hash is just base64 data.
+    if (frag.indexOf("=") === -1 || frag.indexOf("d=") === -1) {
+        return { sid: "legacy", part: 1, total: 1, data: frag };
+    }
+
+    const params = {};
+    frag.split("&").forEach(kv => {
+        const eq = kv.indexOf("=");
+        if (eq > 0) params[kv.slice(0, eq)] = kv.slice(eq + 1);
+    });
+
+    return {
+        sid: params.sid || "nosid",
+        part: parseInt(params.part || "1", 10),
+        total: parseInt(params.total || "1", 10),
+        data: params.d || ""
+    };
+}
+
+// Extract the URL fragment from a full URL or a bare fragment string.
+function fragmentFromText(text) {
+    const hashIdx = text.indexOf("#");
+    if (hashIdx >= 0) return text.slice(hashIdx + 1);
+    return text;  // assume it's already a bare fragment
+}
+
+// Ingest one fragment. Returns true if it was accepted.
+function ingestFragment(frag) {
+    const f = parseFragment(frag);
+    if (!f) return false;
+
+    // New session? reset.
+    if (scanSession.sid !== f.sid) {
+        scanSession.sid = f.sid;
+        scanSession.total = f.total || 1;
+        scanSession.partsSeen = new Set();
+        scanSession.fullData = null;
+    }
+
+    scanSession.total = f.total || scanSession.total;
+    scanSession.partsSeen.add(f.part);
+
+    // For the demo each part holds the full dataset; decode if we can.
+    if (!scanSession.fullData && f.data) {
+        try {
+            const bytes = decodeBase64URL(f.data);
+            scanSession.fullData = parseBlob(bytes);
+        } catch (e) {
+            // ignore decode errors on an individual part
+        }
+    }
+
+    return true;
+}
+
+function allPartsSeen() {
+    if (scanSession.partsSeen.size < scanSession.total) return false;
+    for (let p = 1; p <= scanSession.total; p++) {
+        if (!scanSession.partsSeen.has(p)) return false;
+    }
+    return true;
 }
 
 function pressureAtTime(samples, timeS) {
@@ -483,21 +674,105 @@ function fmtTime(s) {
     return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
 }
 
-function render() {
+// ── Render the gate (waiting for more parts) ────────────────
+function renderGate() {
     const content = document.getElementById("content");
-    const hash = window.location.hash.replace("#", "");
+    const seen = scanSession.partsSeen.size;
+    const total = scanSession.total;
 
-    if (!hash) {
-        content.innerHTML = '<div class="error">No data found in URL.</div>';
+    let pills = "";
+    for (let p = 1; p <= total; p++) {
+        const done = scanSession.partsSeen.has(p);
+        pills += `<div class="pill ${done ? "done" : ""}">
+            ${done ? '<span class="tick">&#10003;</span>' : ''}
+            Code ${p}
+        </div>`;
+    }
+
+    content.innerHTML = `
+        <div class="scan-gate">
+            <div class="scan-progress">${pills}</div>
+            <h2>Scanned ${seen} of ${total}</h2>
+            <p>Press the button on the device to show the next QR code,
+               then scan it here to complete the procedure report.</p>
+            <div id="reader"></div>
+            <button class="scan-btn" id="startScanBtn">Scan next code</button>
+            <div class="scan-hint" id="scanHint"></div>
+        </div>
+    `;
+
+    document.getElementById("startScanBtn")
+        .addEventListener("click", startInPageScan);
+}
+
+function stopScanner(cb) {
+    if (qrScanner) {
+        qrScanner.stop().then(() => {
+            qrScanner.clear();
+            qrScanner = null;
+            if (cb) cb();
+        }).catch(() => {
+            qrScanner = null;
+            if (cb) cb();
+        });
+    } else if (cb) {
+        cb();
+    }
+}
+
+function startInPageScan() {
+    const btn = document.getElementById("startScanBtn");
+    const hint = document.getElementById("scanHint");
+    btn.disabled = true;
+    btn.textContent = "Starting camera…";
+
+    if (typeof Html5Qrcode === "undefined") {
+        hint.textContent = "Scanner library failed to load. Check your connection and reload.";
+        btn.disabled = false;
+        btn.textContent = "Scan next code";
         return;
     }
 
-    let data;
-    try {
-        const bytes = decodeBase64URL(hash);
-        data = parseBlob(bytes);
-    } catch (e) {
-        content.innerHTML = '<div class="error">Failed to decode data: ' + e.message + '</div>';
+    qrScanner = new Html5Qrcode("reader");
+    const config = { fps: 10, qrbox: { width: 240, height: 240 } };
+
+    qrScanner.start(
+        { facingMode: "environment" },
+        config,
+        (decodedText) => {
+            // Got a scan — ingest it.
+            const frag = fragmentFromText(decodedText);
+            const accepted = ingestFragment(frag);
+            if (accepted) {
+                stopScanner(() => {
+                    if (allPartsSeen()) {
+                        renderReport();
+                    } else {
+                        renderGate();
+                    }
+                });
+            }
+        },
+        (errMsg) => { /* per-frame decode failures: ignore */ }
+    ).then(() => {
+        btn.style.display = "none";
+        hint.textContent = "Point the camera at the next QR code on the device.";
+    }).catch((err) => {
+        hint.textContent = "Could not start camera: " + err +
+            ". Make sure camera permission is allowed for this site.";
+        btn.disabled = false;
+        btn.textContent = "Scan next code";
+        qrScanner = null;
+    });
+}
+
+// ── Render the full report ──────────────────────────────────
+function renderReport() {
+    const content = document.getElementById("content");
+    const data = scanSession.fullData;
+
+    if (!data) {
+        content.innerHTML = '<div class="error">Data could not be decoded from the scanned codes.</div>';
         return;
     }
 
@@ -558,8 +833,43 @@ function render() {
     });
 }
 
+// ── Entry point ─────────────────────────────────────────────
+function render() {
+    const content = document.getElementById("content");
+    const hash = window.location.hash.replace("#", "");
+
+    if (!hash) {
+        content.innerHTML = '<div class="error">No data found in URL. Scan the device QR code to begin.</div>';
+        return;
+    }
+
+    const accepted = ingestFragment(hash);
+    if (!accepted) {
+        content.innerHTML = '<div class="error">Could not read the scanned code.</div>';
+        return;
+    }
+
+    if (allPartsSeen()) {
+        renderReport();
+    } else {
+        renderGate();
+    }
+}
+
 render();
-window.addEventListener("hashchange", render);
+
+// If the page is reopened with a new hash (e.g. user scans part 2 with
+// the native camera instead of the in-page scanner), handle it too.
+window.addEventListener("hashchange", () => {
+    const hash = window.location.hash.replace("#", "");
+    if (!hash) return;
+    ingestFragment(hash);
+    if (allPartsSeen()) {
+        renderReport();
+    } else {
+        renderGate();
+    }
+});
 </script>
 
 </body>
